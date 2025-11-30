@@ -624,6 +624,10 @@ const App: React.FC = () => {
     await saveProductToDb(updatedProduct);
     await saveLogToDb(log);
     setIsStockTakeModalOpen(false);
+
+    // Feedback visual imediat pentru consum
+    const unit = selectedProduct.unit;
+    alert(`Inventar actualizat!\n\nStoc anterior: ${selectedBatch.currentStock} ${unit}\nNumărat: ${actualQty} ${unit}\n\nCONSUM (Diferență): ${consumption.toFixed(2)} ${unit}`);
   };
 
   const closeModal = async (setter: (val: boolean) => void) => {

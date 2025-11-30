@@ -35,6 +35,11 @@ try {
 
 // --- Functii ---
 
+// Helper to remove undefined fields because Firestore throws an error on them
+const cleanData = (data: any) => {
+    return JSON.parse(JSON.stringify(data));
+};
+
 export const subscribeToProducts = (callback: (products: Product[]) => void) => {
     if (!db) return () => {};
     
@@ -59,12 +64,12 @@ export const subscribeToLogs = (callback: (logs: InventoryLog[]) => void) => {
 
 export const saveProductToDb = async (product: Product) => {
     if (!db) return;
-    await setDoc(doc(db, "products", product.id), product);
+    await setDoc(doc(db, "products", product.id), cleanData(product));
 };
 
 export const saveLogToDb = async (log: InventoryLog) => {
     if (!db) return;
-    await setDoc(doc(db, "logs", log.id), log);
+    await setDoc(doc(db, "logs", log.id), cleanData(log));
 };
 
 export const isFirebaseConfigured = () => !!db;
