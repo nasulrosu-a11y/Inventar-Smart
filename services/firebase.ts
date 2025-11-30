@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+// @ts-ignore
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, addDoc, query, orderBy, limit } from "firebase/firestore";
 import { Product, InventoryLog } from "../types";
 

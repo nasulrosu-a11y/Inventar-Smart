@@ -838,7 +838,11 @@ const App: React.FC = () => {
                           <div className="flex-1">
                               <div className="flex items-center gap-2">
                                   <h4 className="text-lg font-bold text-gray-900">{product.name}</h4>
-                                  {isLocked && <Lock className="w-4 h-4 text-red-500" title={`Blocat de ${product.lockedBy}`} />}
+                                  {isLocked && (
+                                    <span title={`Blocat de ${product.lockedBy}`}>
+                                      <Lock className="w-4 h-4 text-red-500" />
+                                    </span>
+                                  )}
                               </div>
                               <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">PLU: {product.plu || '-'}</span>
