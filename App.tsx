@@ -26,11 +26,12 @@ import {
   AlertOctagon,
   Globe,
   HelpCircle,
-  WifiOff
+  Pencil,
+  RefreshCw,
+  Store
 } from 'lucide-react';
 import { Product, InventoryLog, TransactionType, Batch, ShoppingListItem } from './types';
 import { generateInventoryReport } from './services/geminiService';
-import { subscribeToProducts, subscribeToLogs, saveProductToDb, saveLogToDb, isFirebaseConfigured } from './services/firebase';
 import { Button } from './components/Button';
 import { Modal } from './components/Modal';
 
@@ -46,7 +47,7 @@ const TRANSLATIONS = {
     backup: "Backup",
     restore: "Restaurare",
     export: "Export",
-    list: "Listă",
+    list: "Listă Cumpărături",
     report: "Raport AI",
     criticalStock: "Stoc Critic",
     expiringSoon: "Expiră Curând",
@@ -56,7 +57,7 @@ const TRANSLATIONS = {
     nameLabel: "Nume Produs (De pe etichetă)",
     firstBatch: "Primul Lot (Intrare Marfă)",
     batch: "Lot",
-    manufacturer: "Producător",
+    manufacturer: "Brand",
     store: "Magazin",
     price: "Preț (RON)",
     expiration: "Data Expirare",
@@ -65,6 +66,8 @@ const TRANSLATIONS = {
     cancel: "Anulează",
     add: "Adaugă",
     confirm: "Confirmă",
+    update: "Actualizează",
+    editBatch: "Editează Detalii Lot",
     countQuestion: "Cât ai numărat?",
     systemStock: "În sistem",
     actualCount: "Numărătoarea ta",
@@ -83,7 +86,13 @@ const TRANSLATIONS = {
     inventoryTitle: "Inventar Rapid",
     expiredStatus: "EXPIRAT",
     daysLeft: "zile rămase",
-    dbError: "Eroare Conexiune: Configurați Firebase în cod pentru modul LIVE!"
+    optionalDetails: "Detalii Opționale (Preț, Coduri, Magazin)",
+    generateList: "Generează Listă Inteligentă",
+    shoppingListDesc: "Calculează necesarul bazat pe consum + 15% marjă.",
+    recStore: "Magazin Recomandat",
+    recPrice: "Cel mai bun preț",
+    neededQty: "Necesar",
+    downloadList: "Descarcă Listă CSV"
   },
   en: {
     appTitle: "Inventory",
@@ -92,7 +101,7 @@ const TRANSLATIONS = {
     backup: "Backup",
     restore: "Restore",
     export: "Export",
-    list: "List",
+    list: "Shopping List",
     report: "AI Report",
     criticalStock: "Critical Stock",
     expiringSoon: "Expiring Soon",
@@ -102,7 +111,7 @@ const TRANSLATIONS = {
     nameLabel: "Product Name (From Label)",
     firstBatch: "First Batch (New Stock)",
     batch: "Batch",
-    manufacturer: "Manufacturer",
+    manufacturer: "Brand",
     store: "Store",
     price: "Price (RON)",
     expiration: "Exp. Date",
@@ -111,6 +120,8 @@ const TRANSLATIONS = {
     cancel: "Cancel",
     add: "Add",
     confirm: "Confirm",
+    update: "Update",
+    editBatch: "Edit Batch Details",
     countQuestion: "How many did you count?",
     systemStock: "System",
     actualCount: "Your Count",
@@ -129,7 +140,13 @@ const TRANSLATIONS = {
     inventoryTitle: "Quick Inventory",
     expiredStatus: "EXPIRED",
     daysLeft: "days left",
-    dbError: "Connection Error: Configure Firebase in code for LIVE mode!"
+    optionalDetails: "Optional Details (Price, Codes, Store)",
+    generateList: "Generate Smart List",
+    shoppingListDesc: "Calculates needs based on consumption + 15% buffer.",
+    recStore: "Recommended Store",
+    recPrice: "Best Price",
+    neededQty: "Needed",
+    downloadList: "Download List CSV"
   },
   ne: { // Nepali Translations (Simplified)
     appTitle: "इन्भेन्टरी (Inventory)",
@@ -138,7 +155,7 @@ const TRANSLATIONS = {
     backup: "ब्याकअप",
     restore: "रिस्टोर",
     export: "निर्यात",
-    list: "सूची",
+    list: "किनमेल सूची (Shopping List)",
     report: "AI रिपोर्ट",
     criticalStock: "कम स्टक (Low Stock)",
     expiringSoon: "म्याद सकिँदै (Expiring)",
@@ -148,7 +165,7 @@ const TRANSLATIONS = {
     nameLabel: "सामानको नाम (Name)",
     firstBatch: "पहilo लट (First Lot)",
     batch: "लट (Batch)",
-    manufacturer: "कम्पनी (Company)",
+    manufacturer: "ब्रान्ड (Brand)",
     store: "पसल (Store)",
     price: "मूल्य (Price)",
     expiration: "म्याद (Exp. Date)",
@@ -157,6 +174,8 @@ const TRANSLATIONS = {
     cancel: "रद्द गर्नुहोस् (Cancel)",
     add: "थप्नुहोस् (Add)",
     confirm: "पक्का गर्नुहोस् (Confirm)",
+    update: "अप्डेट (Update)",
+    editBatch: "विवरण सच्याउनुहोस् (Edit)",
     countQuestion: "कति गन्ती गर्नुभयो? (How many?)",
     systemStock: "सिस्टममा (System)",
     actualCount: "तपाईंको गन्ती (Your Count)",
@@ -175,7 +194,13 @@ const TRANSLATIONS = {
     inventoryTitle: "छिटो इन्भेन्टरी",
     expiredStatus: "म्याद सकियो",
     daysLeft: "दिन बाँकी",
-    dbError: "जडान त्रुटि: लाइभ मोडको लागि फायरबेस कन्फिगर गर्नुहोस्!"
+    optionalDetails: "वैकल्पिक विवरणहरू",
+    generateList: "सूची बनाउनुहोस् (Generate)",
+    shoppingListDesc: "खपत + १५% बढी (Consumption + 15%)",
+    recStore: "रामro पसल (Rec. Store)",
+    recPrice: "राम्रो मूल्य (Best Price)",
+    neededQty: "चाहिने मात्रा (Needed)",
+    downloadList: "CSV डाउनलोड गर्नुहोस्"
   }
 };
 
@@ -217,28 +242,23 @@ const getDaysUntilExpiration = (dateStr?: string) => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 };
 
-// --- Helper Components ---
+// --- Components ---
 
-interface StatCardProps {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  colorClass: string;
-  textColor?: string;
-}
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon, colorClass, textColor = 'text-gray-900' }) => (
-  <div className="bg-white overflow-hidden shadow-sm rounded-lg flex items-center p-3 border border-gray-100">
-    <div className={`flex-shrink-0 rounded-md p-2 ${colorClass}`}>
-      {icon}
-    </div>
-    <div className="ml-3 w-0 flex-1">
-      <dl>
-        <dt className="text-xs font-medium text-gray-500 truncate uppercase tracking-wider">{title}</dt>
-        <dd>
-          <div className={`text-xl font-bold ${textColor}`}>{value}</div>
-        </dd>
-      </dl>
+const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; colorClass: string; textColor?: string, subtext?: string }> = ({ title, value, icon, colorClass, textColor = "text-gray-900", subtext }) => (
+  <div className="bg-white overflow-hidden shadow-sm rounded-lg flex-1 min-w-[150px] border border-gray-100">
+    <div className="p-4">
+      <div className="flex items-start">
+        <div className={`flex-shrink-0 rounded-md p-2 ${colorClass}`}>
+          {icon}
+        </div>
+        <div className="ml-3 w-0 flex-1">
+          <dl>
+            <dt className="text-xs font-bold text-gray-500 uppercase tracking-wide">{title}</dt>
+            <dd className={`text-2xl font-bold ${textColor}`}>{value}</dd>
+            {subtext && <dd className="text-[10px] text-gray-400 mt-1">{subtext}</dd>}
+          </dl>
+        </div>
+      </div>
     </div>
   </div>
 );
@@ -250,15 +270,22 @@ const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('ro');
   const t = TRANSLATIONS[lang];
 
-  // REAL-TIME DATA FROM FIREBASE
-  const [products, setProducts] = useState<Product[]>([]);
-  const [logs, setLogs] = useState<InventoryLog[]>([]);
-  const [dbConfigured, setDbConfigured] = useState(true);
+  const [products, setProducts] = useState<Product[]>(() => {
+    const saved = localStorage.getItem('inventory_products_v2');
+    if (saved) return JSON.parse(saved);
+    return [];
+  });
+  
+  const [logs, setLogs] = useState<InventoryLog[]>(() => {
+    const saved = localStorage.getItem('inventory_logs_v2');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // UI State
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false); 
+  const [isEditBatchModalOpen, setIsEditBatchModalOpen] = useState(false);
   const [isStockTakeModalOpen, setIsStockTakeModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isShoppingListModalOpen, setIsShoppingListModalOpen] = useState(false);
@@ -272,6 +299,9 @@ const App: React.FC = () => {
   // Selection State
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  
+  // Shopping List State
+  const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   
   // AI Report State
   const [isReportLoading, setIsReportLoading] = useState(false);
@@ -293,34 +323,24 @@ const App: React.FC = () => {
   // Form State - Stock Take
   const [countQuantity, setCountQuantity] = useState('');
 
-  // --- Effects (Subscriptions) ---
-  
+  // --- Effects ---
   useEffect(() => {
-      // Check config
-      if (!isFirebaseConfigured()) {
-          setDbConfigured(false);
-          // Fallback to local storage only if DB not set, for demo purposes
-          const savedP = localStorage.getItem('inventory_products_v2');
-          if (savedP) setProducts(JSON.parse(savedP));
-          return;
-      }
+    localStorage.setItem('inventory_products_v2', JSON.stringify(products));
+  }, [products]);
 
-      // Subscribe to LIVE updates
-      const unsubProd = subscribeToProducts((data) => {
-          setProducts(data);
-          // Optional: Keep local backup
-          localStorage.setItem('inventory_products_v2', JSON.stringify(data));
-      });
+  useEffect(() => {
+    localStorage.setItem('inventory_logs_v2', JSON.stringify(logs));
+  }, [logs]);
 
-      const unsubLogs = subscribeToLogs((data) => {
-          setLogs(data);
-          localStorage.setItem('inventory_logs_v2', JSON.stringify(data));
-      });
-
-      return () => {
-          unsubProd();
-          unsubLogs();
-      };
+  // Sync tabs helper (Simulate multi-user)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === 'inventory_products_v2' && e.newValue) {
+            setProducts(JSON.parse(e.newValue));
+        }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // --- Logic Helpers ---
@@ -384,27 +404,31 @@ const App: React.FC = () => {
 
   const isSaturday = new Date().getDay() === 6;
 
-  // --- Locking System (Simplified for DB) ---
+  // --- Locking System ---
   const acquireLock = (product: Product) => {
-      // In a real DB app, this would be a transaction. 
-      // For this version, we just check current state from DB subscription.
+      // If already locked by someone else and lock is fresh (< 5 mins)
       const now = Date.now();
       if (product.lockedBy && product.lockedBy !== CURRENT_USER_ID && product.lockTimestamp && (now - product.lockTimestamp < 5 * 60 * 1000)) {
-          return false;
+          return false; // Lock failed
       }
+      
+      // Apply lock
+      const updatedProducts = products.map(p => p.id === product.id ? { ...p, lockedBy: CURRENT_USER_ID, lockTimestamp: now } : p);
+      setProducts(updatedProducts);
       return true;
   };
 
-  const releaseLock = async (product: Product) => {
+  const releaseLock = (product: Product) => {
       if (product.lockedBy === CURRENT_USER_ID) {
-          const updated = { ...product, lockedBy: undefined, lockTimestamp: undefined };
-          await saveProductToDb(updated);
+          const updatedProducts = products.map(p => p.id === product.id ? { ...p, lockedBy: undefined, lockTimestamp: undefined } : p);
+          setProducts(updatedProducts);
       }
   };
 
-  const forceUnlock = async (product: Product) => {
-      const updated = { ...product, lockedBy: CURRENT_USER_ID, lockTimestamp: Date.now() };
-      await saveProductToDb(updated);
+  const forceUnlock = (product: Product) => {
+      // Steal the lock
+      const updatedProducts = products.map(p => p.id === product.id ? { ...p, lockedBy: CURRENT_USER_ID, lockTimestamp: Date.now() } : p);
+      setProducts(updatedProducts);
       alert(`${t.forceUnlock}: ${product.name}`);
   };
 
@@ -440,7 +464,7 @@ const App: React.FC = () => {
       }
   };
 
-  const handleCreateProduct = async (e: React.FormEvent) => {
+  const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!batchExp) { alert("Data expirare obligatorie!"); return; }
 
@@ -461,13 +485,18 @@ const App: React.FC = () => {
     };
 
     if (targetProduct) {
-        // Update existing - DB Logic
-        const updatedProduct = {
-            ...targetProduct,
-            plu: batchPlu || targetProduct.plu,
-            batches: [...targetProduct.batches, newBatch],
-            lastUpdated: new Date().toISOString()
-        };
+        // Update existing
+        const updatedProducts = products.map(p => {
+            if (p.id === targetProduct.id) {
+                return {
+                    ...p,
+                    plu: batchPlu || p.plu,
+                    batches: [...p.batches, newBatch],
+                    lastUpdated: new Date().toISOString()
+                };
+            }
+            return p;
+        });
         
         const log: InventoryLog = {
             id: crypto.randomUUID(),
@@ -480,8 +509,8 @@ const App: React.FC = () => {
             notes: `Lot adăugat automat (consolidare). Magazin: ${newBatch.store}`
         };
 
-        await saveProductToDb(updatedProduct);
-        await saveLogToDb(log);
+        setProducts(updatedProducts);
+        setLogs([log, ...logs]);
         alert(`Produs existent (${targetProduct.name}). Lot adăugat.`);
     } else {
         // Create new
@@ -503,24 +532,20 @@ const App: React.FC = () => {
           actualCount: newBatch.currentStock,
           notes: `Produs nou. Magazin: ${newBatch.store}`
         };
-        await saveProductToDb(newProduct);
-        await saveLogToDb(log);
+        setProducts([...products, newProduct]);
+        setLogs([log, ...logs]);
     }
     setIsAddModalOpen(false);
     setNewProductName('');
     resetBatchForm();
   };
 
-  const openAddStockModal = async (product: Product) => {
+  const openAddStockModal = (product: Product) => {
     if (!acquireLock(product)) {
         if (!window.confirm(`${t.alertLocked} ${t.lockedBy} ${product.lockedBy}. ${t.forceUnlock}?`)) {
             return;
         }
-        await forceUnlock(product);
-    } else {
-        // Lock it
-        const lockedP = { ...product, lockedBy: CURRENT_USER_ID, lockTimestamp: Date.now() };
-        await saveProductToDb(lockedP);
+        forceUnlock(product);
     }
 
     setSelectedProduct(product);
@@ -539,7 +564,7 @@ const App: React.FC = () => {
     setIsBatchModalOpen(true);
   };
 
-  const handleAddBatch = async (e: React.FormEvent) => {
+  const handleAddBatch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
     if (!batchExp) { alert("Data expirare obligatorie!"); return; }
@@ -556,13 +581,14 @@ const App: React.FC = () => {
       dateAdded: new Date().toISOString()
     };
 
-    const updatedProduct = {
-          ...selectedProduct,
-          plu: batchPlu || selectedProduct.plu,
-          batches: [...selectedProduct.batches, newBatch],
+    const updatedProducts = products.map(p => p.id === selectedProduct.id ? {
+          ...p,
+          plu: batchPlu || p.plu,
+          batches: [...p.batches, newBatch],
           lastUpdated: new Date().toISOString(),
           lockedBy: undefined // Release lock on save
-    };
+        } : p
+    );
 
     const log: InventoryLog = {
       id: crypto.randomUUID(),
@@ -575,21 +601,64 @@ const App: React.FC = () => {
       notes: `Lot nou adăugat. Exp: ${newBatch.expirationDate}`
     };
 
-    await saveProductToDb(updatedProduct);
-    await saveLogToDb(log);
+    setProducts(updatedProducts);
+    setLogs([log, ...logs]);
     setIsBatchModalOpen(false);
     resetBatchForm();
   };
 
-  const openStockTakeModal = async (product: Product, batch: Batch) => {
+  const openEditBatchModal = (product: Product, batch: Batch) => {
+      // Don't need strict locking just for fixing typos, but good practice if using DB
+      setSelectedProduct(product);
+      setSelectedBatch(batch);
+      
+      // Prefill fields
+      setBatchPlu(batch.plu || product.plu || '');
+      setBatchEan(batch.ean || '');
+      setBatchManuf(batch.manufacturer || '');
+      setBatchStore(batch.store || '');
+      setBatchPrice(batch.priceNoVat ? batch.priceNoVat.toString() : '');
+      setBatchExp(batch.expirationDate || '');
+      
+      setIsEditBatchModalOpen(true);
+  };
+
+  const handleUpdateBatchDetails = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedProduct || !selectedBatch) return;
+
+      const updatedProducts = products.map(p => {
+          if (p.id === selectedProduct.id) {
+              const updatedBatches = p.batches.map(b => {
+                  if (b.id === selectedBatch.id) {
+                      return {
+                          ...b,
+                          plu: batchPlu,
+                          ean: batchEan,
+                          manufacturer: batchManuf, // "Brand" in UI
+                          store: batchStore,
+                          priceNoVat: parseFloat(batchPrice) || 0,
+                          expirationDate: batchExp
+                      };
+                  }
+                  return b;
+              });
+              return { ...p, batches: updatedBatches, lastUpdated: new Date().toISOString() };
+          }
+          return p;
+      });
+
+      setProducts(updatedProducts);
+      setIsEditBatchModalOpen(false);
+      resetBatchForm();
+  };
+
+  const openStockTakeModal = (product: Product, batch: Batch) => {
     if (!acquireLock(product)) {
          if (!window.confirm(`${t.alertLocked} ${t.lockedBy} ${product.lockedBy}. ${t.forceUnlock}?`)) {
             return;
         }
-        await forceUnlock(product);
-    } else {
-        const lockedP = { ...product, lockedBy: CURRENT_USER_ID, lockTimestamp: Date.now() };
-        await saveProductToDb(lockedP);
+        forceUnlock(product);
     }
 
     setSelectedProduct(product);
@@ -598,15 +667,20 @@ const App: React.FC = () => {
     setIsStockTakeModalOpen(true);
   };
 
-  const handleStockTake = async (e: React.FormEvent) => {
+  const handleStockTake = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct || !selectedBatch) return;
     const actualQty = parseFloat(countQuantity);
     if (isNaN(actualQty)) return;
     const consumption = selectedBatch.currentStock - actualQty;
 
-    const updatedBatches = selectedProduct.batches.map(b => b.id === selectedBatch.id ? { ...b, currentStock: actualQty } : b);
-    const updatedProduct = { ...selectedProduct, batches: updatedBatches, lastUpdated: new Date().toISOString(), lockedBy: undefined };
+    const updatedProducts = products.map(p => {
+      if (p.id === selectedProduct.id) {
+        const updatedBatches = p.batches.map(b => b.id === selectedBatch.id ? { ...b, currentStock: actualQty } : b);
+        return { ...p, batches: updatedBatches, lastUpdated: new Date().toISOString(), lockedBy: undefined };
+      }
+      return p;
+    });
 
     const log: InventoryLog = {
       id: crypto.randomUUID(),
@@ -621,22 +695,75 @@ const App: React.FC = () => {
       calculatedConsumption: consumption
     };
 
-    await saveProductToDb(updatedProduct);
-    await saveLogToDb(log);
+    setProducts(updatedProducts);
+    setLogs([log, ...logs]);
     setIsStockTakeModalOpen(false);
-
-    // Feedback visual imediat pentru consum
-    const unit = selectedProduct.unit;
-    alert(`Inventar actualizat!\n\nStoc anterior: ${selectedBatch.currentStock} ${unit}\nNumărat: ${actualQty} ${unit}\n\nCONSUM (Diferență): ${consumption.toFixed(2)} ${unit}`);
   };
 
-  const closeModal = async (setter: (val: boolean) => void) => {
+  const closeModal = (setter: (val: boolean) => void) => {
       // Try to release lock if closing without saving
       if (selectedProduct && selectedProduct.lockedBy === CURRENT_USER_ID) {
-          await releaseLock(selectedProduct);
+          releaseLock(selectedProduct);
       }
       setter(false);
   };
+
+  // --- Shopping List Logic ---
+  const handleGenerateShoppingList = () => {
+    const list: ShoppingListItem[] = [];
+
+    products.forEach(p => {
+       const consumption = getConsumptionLast7Days(p.id);
+       if (consumption <= 0) return; // Skip if no usage
+
+       const targetStock = consumption * 1.15; // 15% buffer
+       const currentStock = getProductTotalStock(p);
+       
+       if (currentStock < targetStock) {
+           const needed = targetStock - currentStock;
+           
+           // Recommendation Logic: Get last 3 batches
+           const last3Batches = [...p.batches]
+             .sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime())
+             .slice(0, 3);
+            
+           // Find lowest price in last 3 batches that has a price > 0
+           let bestBatch: Batch | null = null;
+           if (last3Batches.length > 0) {
+               const validBatches = last3Batches.filter(b => (b.priceNoVat || 0) > 0);
+               if (validBatches.length > 0) {
+                 bestBatch = validBatches.reduce((prev, curr) => 
+                    (curr.priceNoVat! < prev.priceNoVat!) ? curr : prev
+                 );
+               } else {
+                   bestBatch = last3Batches[0]; // Fallback to most recent
+               }
+           }
+
+           list.push({
+               productName: p.name,
+               unit: p.unit,
+               neededQuantity: parseFloat(needed.toFixed(2)),
+               recommendedStore: bestBatch?.store || 'N/A',
+               recommendedPrice: bestBatch?.priceNoVat || 0,
+               lastManufacturer: bestBatch?.manufacturer || ''
+           });
+       }
+    });
+    
+    // Sort by store to group items
+    list.sort((a,b) => a.recommendedStore.localeCompare(b.recommendedStore));
+    setShoppingList(list);
+  };
+  
+  const handleExportShoppingList = () => {
+      const headers = "Magazin,Produs,Cantitate Necesară,Unitate,Preț Estimat,Brand Anterior\n";
+      const rows = shoppingList.map(item => 
+        `"${item.recommendedStore}","${item.productName}",${item.neededQuantity},${item.unit},${item.recommendedPrice},"${item.lastManufacturer}"`
+      ).join('\n');
+      downloadCSV(headers + rows, `Lista_Cumparaturi_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
 
   // --- Backup/Restore/Reports (Simplified) ---
   const handleBackup = () => {
@@ -654,10 +781,9 @@ const App: React.FC = () => {
           try {
               const json = JSON.parse(event.target?.result as string);
               if (json.products && Array.isArray(json.products)) {
-                  if (window.confirm("ATENȚIE: Restaurarea va suprascrie baza de date ONLINE! Ești sigur?")) {
-                      // Bulk upload to firebase would go here, doing one by one for safety in this demo
-                      json.products.forEach((p: Product) => saveProductToDb(p));
-                      alert("Restaurare pornită. Datele se vor actualiza în câteva secunde.");
+                  if (window.confirm("Această acțiune va înlocui baza de date curentă!")) {
+                      setProducts(json.products);
+                      setLogs(json.logs || []);
                   }
               }
           } catch (err) { alert("Eroare fișier."); }
@@ -683,13 +809,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-800">
       
-      {!dbConfigured && (
-          <div className="bg-red-600 text-white p-2 text-center text-sm font-bold flex items-center justify-center gap-2">
-              <WifiOff className="w-4 h-4" />
-              {t.dbError}
-          </div>
-      )}
-
       {/* Inputs hidden */}
       <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleFileChange} />
       <datalist id="stores-list">{uniqueStores.map(store => <option key={store} value={store} />)}</datalist>
@@ -842,11 +961,7 @@ const App: React.FC = () => {
                           <div className="flex-1">
                               <div className="flex items-center gap-2">
                                   <h4 className="text-lg font-bold text-gray-900">{product.name}</h4>
-                                  {isLocked && (
-                                    <span title={`Blocat de ${product.lockedBy}`}>
-                                      <Lock className="w-4 h-4 text-red-500" />
-                                    </span>
-                                  )}
+                                  {isLocked && <span title={`Blocat de ${product.lockedBy}`}><Lock className="w-4 h-4 text-red-500" /></span>}
                               </div>
                               <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">PLU: {product.plu || '-'}</span>
@@ -894,10 +1009,20 @@ const App: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* Layout requested: Manufacturer/Store top */}
-                                    <div className="flex justify-between items-start mb-2 border-b border-gray-100 pb-1">
-                                         <span className="font-bold text-sm text-gray-800 leading-tight truncate pr-2">{batch.manufacturer || 'N/A'}</span>
-                                         <span className="text-xs text-gray-500 whitespace-nowrap">{batch.store || 'N/A'}</span>
+                                    {/* Layout requested: Brand/Store top */}
+                                    <div className="flex justify-between items-start mb-2 border-b border-gray-100 pb-1 relative">
+                                         <div className="flex flex-col overflow-hidden mr-4">
+                                            <span className="font-bold text-sm text-gray-800 leading-tight truncate">{batch.manufacturer || 'N/A'}</span>
+                                            <span className="text-xs text-gray-500 whitespace-nowrap">{batch.store || 'N/A'}</span>
+                                         </div>
+                                         {/* Edit Button - Small Pencil */}
+                                         <button 
+                                            onClick={() => openEditBatchModal(product, batch)}
+                                            className="text-gray-400 hover:text-blue-600 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                                            title="Edit Details"
+                                         >
+                                             <Pencil className="w-3.5 h-3.5" />
+                                         </button>
                                     </div>
                                     
                                     {/* Quantity Row - Main Focus */}
@@ -982,40 +1107,57 @@ const App: React.FC = () => {
 
       {/* 1. Add Product Modal */}
       <Modal isOpen={isAddModalOpen} onClose={() => closeModal(setIsAddModalOpen)} title={t.newProduct}>
-        <form onSubmit={handleCreateProduct} className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
+        <form onSubmit={handleCreateProduct} className="space-y-4 max-h-[75vh] overflow-y-auto p-1">
           <div className="bg-blue-50 p-2 text-xs text-blue-800 rounded border border-blue-200 mb-2">
               ℹ️ {lang === 'ro' ? "Scrie numele exact așa cum apare pe factură/cutie." : "Write name exactly as on the invoice/box."}
           </div>
-          <div>
-            <label className="label">{t.nameLabel}</label>
-            <input type="text" list="product-names-list" required className="input-field" value={newProductName} 
-                onChange={e => {
-                    setNewProductName(e.target.value);
-                    const exist = products.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
-                    if(exist && exist.plu) setBatchPlu(exist.plu);
-                }} placeholder="ex: Zahar Margaritar" />
+          
+          {/* Main Info - High Visibility */}
+          <div className="space-y-4 bg-white p-1 rounded-lg">
+              <div>
+                <label className="label text-blue-800 text-sm mb-1">{t.nameLabel}</label>
+                <input type="text" list="product-names-list" required className="input-field input-highlight" value={newProductName} 
+                    onChange={e => {
+                        setNewProductName(e.target.value);
+                        const exist = products.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
+                        if(exist && exist.plu) setBatchPlu(exist.plu);
+                    }} placeholder="ex: Zahar Margaritar" autoFocus />
+              </div>
+              
+              <div className="grid grid-cols-3 gap-3">
+                 <div className="col-span-1">
+                     <label className="label text-gray-700">{t.unit}</label>
+                     <select className="input-field" value={newProductUnit} onChange={e => setNewProductUnit(e.target.value)}>
+                         <option value="KG">KG</option>
+                         <option value="L">L</option>
+                         <option value="BUC">BUC</option>
+                     </select>
+                 </div>
+                 {/* Quantity MOVED HERE and Highlighted */}
+                 <div className="col-span-2">
+                     <label className="label text-blue-800 text-sm">{t.quantity}*</label>
+                     <input type="number" step="0.01" required className="input-field input-highlight" placeholder="0.00" value={batchStock} onChange={e => setBatchStock(e.target.value)} />
+                 </div>
+              </div>
+
+              <div>
+                  <label className="label text-red-700 text-sm">{t.expiration}*</label>
+                  <input type="date" required className="input-field input-critical" value={batchExp} onChange={e => setBatchExp(e.target.value)} />
+              </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-             <div>
-                 <label className="label">{t.unit}</label>
-                 <select className="input-field" value={newProductUnit} onChange={e => setNewProductUnit(e.target.value)}>
-                     <option value="KG">KG</option>
-                     <option value="L">L</option>
-                 </select>
-             </div>
-             <div><label className="label">{t.plu}</label><input type="text" className="input-field" value={batchPlu} onChange={e => setBatchPlu(e.target.value)} /></div>
-          </div>
-          <div className="bg-slate-50 p-2 rounded border border-slate-200">
-             <h4 className="text-xs font-bold text-gray-700 mb-2 uppercase">{t.firstBatch}</h4>
+
+          {/* Secondary Details - Accordion style visual */}
+          <div className="bg-gray-50 p-3 rounded border border-gray-200 mt-2">
+             <h4 className="text-xs font-bold text-gray-500 mb-2 uppercase border-b pb-1">{t.optionalDetails}</h4>
              <div className="grid grid-cols-2 gap-3">
-                 <div className="col-span-2"><input type="text" className="input-field" placeholder="Scan EAN..." value={batchEan} onChange={e => setBatchEan(e.target.value)} /></div>
-                 <div><input type="text" list="manuf-list" className="input-field" placeholder={t.manufacturer} value={batchManuf} onChange={e => setBatchManuf(e.target.value)} /></div>
-                 <div><input type="text" list="stores-list" className="input-field" placeholder={t.store} value={batchStore} onChange={e => setBatchStore(e.target.value)} /></div>
-                 <div><label className="label">{t.price}</label><input type="number" step="0.01" className="input-field" value={batchPrice} onChange={e => setBatchPrice(e.target.value)} /></div>
-                 <div><label className="label text-red-600">{t.expiration}*</label><input type="date" required className="input-field" value={batchExp} onChange={e => setBatchExp(e.target.value)} /></div>
-                 <div className="col-span-2"><label className="label text-green-700 font-bold">{t.quantity}*</label><input type="number" step="0.01" required className="input-field border-green-400 bg-green-50" value={batchStock} onChange={e => setBatchStock(e.target.value)} /></div>
+                 <div className="col-span-2"><input type="text" className="input-field text-sm" placeholder="Scan EAN..." value={batchEan} onChange={e => setBatchEan(e.target.value)} /></div>
+                 <div><input type="text" list="manuf-list" className="input-field text-sm" placeholder={t.manufacturer} value={batchManuf} onChange={e => setBatchManuf(e.target.value)} /></div>
+                 <div><input type="text" list="stores-list" className="input-field text-sm" placeholder={t.store} value={batchStore} onChange={e => setBatchStore(e.target.value)} /></div>
+                 <div><label className="label">{t.price}</label><input type="number" step="0.01" className="input-field text-sm" value={batchPrice} onChange={e => setBatchPrice(e.target.value)} /></div>
+                 <div><label className="label">{t.plu}</label><input type="text" className="input-field text-sm" value={batchPlu} onChange={e => setBatchPlu(e.target.value)} /></div>
              </div>
           </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => closeModal(setIsAddModalOpen)}>{t.cancel}</Button>
             <Button type="submit">{t.save}</Button>
@@ -1023,7 +1165,7 @@ const App: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 2. Add Stock Modal */}
+      {/* 2. Add Stock Modal (New Batch) */}
       <Modal isOpen={isBatchModalOpen} onClose={() => closeModal(setIsBatchModalOpen)} title={selectedProduct?.lockedBy && selectedProduct.lockedBy !== CURRENT_USER_ID ? `${t.alertLocked} (${selectedProduct.lockedBy})` : t.addStockTitle}>
          <form onSubmit={handleAddBatch} className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
              {selectedProduct?.lockedBy && selectedProduct.lockedBy !== CURRENT_USER_ID && (
@@ -1031,13 +1173,29 @@ const App: React.FC = () => {
                      {t.alertLocked}
                  </div>
              )}
-             <div className="grid grid-cols-2 gap-3">
-                 <div className="col-span-2"><input type="text" className="input-field" placeholder="Scan EAN..." value={batchEan} onChange={e => setBatchEan(e.target.value)} /></div>
-                 <div><input type="text" list="manuf-list" className="input-field" placeholder={t.manufacturer} value={batchManuf} onChange={e => setBatchManuf(e.target.value)} /></div>
-                 <div><input type="text" list="stores-list" className="input-field" placeholder={t.store} value={batchStore} onChange={e => setBatchStore(e.target.value)} /></div>
-                 <div><label className="label">{t.expiration}*</label><input type="date" required className="input-field" value={batchExp} onChange={e => setBatchExp(e.target.value)} /></div>
-                 <div><label className="label">{t.quantity}*</label><input type="number" required className="input-field border-green-400 bg-green-50" placeholder={t.quantity} value={batchStock} onChange={e => setBatchStock(e.target.value)} /></div>
+             
+             {/* Critical Info First */}
+             <div className="grid grid-cols-2 gap-4">
+                 <div className="col-span-2">
+                     <label className="label text-blue-800 text-lg mb-1">{t.quantity}*</label>
+                     <input type="number" required autoFocus className="input-field input-highlight text-xl p-3" placeholder="0.00" value={batchStock} onChange={e => setBatchStock(e.target.value)} />
+                 </div>
+                 <div className="col-span-2">
+                     <label className="label text-red-700">{t.expiration}*</label>
+                     <input type="date" required className="input-field input-critical" value={batchExp} onChange={e => setBatchExp(e.target.value)} />
+                 </div>
              </div>
+
+             {/* Secondary Info */}
+             <div className="bg-gray-50 p-3 rounded border border-gray-200 mt-2">
+                <h4 className="text-xs font-bold text-gray-500 mb-2 uppercase border-b pb-1">{t.optionalDetails}</h4>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2"><input type="text" className="input-field text-sm" placeholder="Scan EAN..." value={batchEan} onChange={e => setBatchEan(e.target.value)} /></div>
+                    <div><input type="text" list="manuf-list" className="input-field text-sm" placeholder={t.manufacturer} value={batchManuf} onChange={e => setBatchManuf(e.target.value)} /></div>
+                    <div><input type="text" list="stores-list" className="input-field text-sm" placeholder={t.store} value={batchStore} onChange={e => setBatchStore(e.target.value)} /></div>
+                </div>
+             </div>
+
              <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => closeModal(setIsBatchModalOpen)}>{t.cancel}</Button>
                 <Button type="submit">{t.add}</Button>
@@ -1045,7 +1203,47 @@ const App: React.FC = () => {
          </form>
       </Modal>
 
-      {/* 3. Stock Take Modal */}
+      {/* 3. Edit Batch Details Modal */}
+      <Modal isOpen={isEditBatchModalOpen} onClose={() => setIsEditBatchModalOpen(false)} title={t.editBatch}>
+          <form onSubmit={handleUpdateBatchDetails} className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
+              <div className="bg-amber-50 p-3 rounded text-sm border border-amber-200 mb-2">
+                  <p><strong>{selectedProduct?.name}</strong></p>
+                  <p className="text-xs text-gray-500">Modificarea acestor detalii nu afectează cantitatea din stoc.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="label">{t.manufacturer} (Brand)</label>
+                    <input type="text" list="manuf-list" className="input-field" placeholder={t.manufacturer} value={batchManuf} onChange={e => setBatchManuf(e.target.value)} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="label">{t.store}</label>
+                    <input type="text" list="stores-list" className="input-field" placeholder={t.store} value={batchStore} onChange={e => setBatchStore(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label">{t.price}</label>
+                    <input type="number" step="0.01" className="input-field" value={batchPrice} onChange={e => setBatchPrice(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label">{t.expiration}</label>
+                    <input type="date" className="input-field" value={batchExp} onChange={e => setBatchExp(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label">PLU</label>
+                    <input type="text" className="input-field" value={batchPlu} onChange={e => setBatchPlu(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label">EAN</label>
+                    <input type="text" className="input-field" value={batchEan} onChange={e => setBatchEan(e.target.value)} />
+                  </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setIsEditBatchModalOpen(false)}>{t.cancel}</Button>
+                  <Button type="submit">{t.update}</Button>
+              </div>
+          </form>
+      </Modal>
+
+      {/* 4. Stock Take Modal */}
       <Modal isOpen={isStockTakeModalOpen} onClose={() => closeModal(setIsStockTakeModalOpen)} title={t.inventoryTitle}>
         <form onSubmit={handleStockTake} className="space-y-4">
             <div className="bg-slate-100 p-3 rounded text-sm">
@@ -1065,14 +1263,76 @@ const App: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 4. Shopping List Modal */}
+      {/* 5. Shopping List Modal - REDESIGNED */}
       <Modal isOpen={isShoppingListModalOpen} onClose={() => setIsShoppingListModalOpen(false)} title={t.list}>
-         <div className="text-center py-4">
-            <Button onClick={handleExportCurrentStock} icon={<Download className="w-4 h-4"/>}>CSV</Button>
+         <div className="space-y-4">
+            <div className="bg-blue-50 p-3 rounded border border-blue-100 flex items-start gap-3">
+                <ShoppingCart className="w-6 h-6 text-blue-600 mt-1" />
+                <div>
+                    <h4 className="font-bold text-blue-900">{t.generateList}</h4>
+                    <p className="text-xs text-blue-800">{t.shoppingListDesc}</p>
+                </div>
+            </div>
+
+            <div className="flex justify-center">
+                <Button onClick={handleGenerateShoppingList} className="w-full sm:w-auto" icon={<RefreshCw className="w-4 h-4"/>}>
+                    {t.generateList}
+                </Button>
+            </div>
+
+            {shoppingList.length > 0 && (
+                <>
+                <div className="max-h-[50vh] overflow-y-auto border rounded-lg border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t.nameLabel}</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t.neededQty}</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">{t.recStore}</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">{t.recPrice}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {shoppingList.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                    <td className="px-3 py-2">
+                                        <div className="font-medium text-gray-900 text-sm">{item.productName}</div>
+                                        <div className="text-xs text-gray-500 sm:hidden">
+                                            {item.recommendedStore} - {item.recommendedPrice} L
+                                        </div>
+                                    </td>
+                                    <td className="px-3 py-2 text-sm font-bold text-red-600">
+                                        {item.neededQuantity} {item.unit}
+                                    </td>
+                                    <td className="px-3 py-2 text-sm text-gray-700 hidden sm:table-cell">
+                                        {item.recommendedStore}
+                                    </td>
+                                    <td className="px-3 py-2 text-sm text-gray-700 hidden sm:table-cell">
+                                        {item.recommendedPrice > 0 ? item.recommendedPrice + ' L' : '-'}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div className="pt-2">
+                    <Button onClick={handleExportShoppingList} variant="outline" className="w-full" icon={<Download className="w-4 h-4"/>}>
+                        {t.downloadList}
+                    </Button>
+                </div>
+                </>
+            )}
+            
+            {shoppingList.length === 0 && (
+                 <p className="text-center text-gray-500 py-4 text-sm italic">
+                    Apasă "Generează" pentru a vedea necesarul de marfă.
+                 </p>
+            )}
          </div>
       </Modal>
 
-      {/* 5. Report Modal */}
+      {/* 6. Report Modal */}
       <Modal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} title={t.report}>
          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
            {isReportLoading ? <p className="text-center py-4">Loading...</p> : 
@@ -1092,6 +1352,8 @@ const App: React.FC = () => {
 
       <style>{`
         .input-field { @apply mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base p-2.5 border; }
+        .input-highlight { @apply border-2 border-blue-400 bg-blue-50 text-blue-900 font-bold; }
+        .input-critical { @apply border-2 border-red-300 bg-red-50 text-red-900 font-bold; }
         .label { @apply block text-xs font-bold text-gray-700 uppercase tracking-wide; }
       `}</style>
     </div>

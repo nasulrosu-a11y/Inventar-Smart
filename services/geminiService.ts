@@ -1,14 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { Product, InventoryLog, TransactionType } from "../types";
 
-// Initialize AI with the environment variable directly as per guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.API_KEY || '';
+const ai = new GoogleGenAI({ apiKey });
 
 export const generateInventoryReport = async (
   products: Product[], 
   logs: InventoryLog[]
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     return "Cheia API Gemini nu este configurată. Vă rugăm să setați API_KEY.";
   }
 
